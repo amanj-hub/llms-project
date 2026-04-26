@@ -122,6 +122,7 @@ async function seed() {
     name: u.name, email: u.email, role: u.role, color: u.color,
     initials: u.name.split(' ').map(w => w[0]).join('').toUpperCase(),
     password: await bcrypt.hash(u.pass, 12),
+    isVerified: true,
   })));
   const createdUsers = await User.insertMany(hashedUsers);
   console.log(`👥  Seeded ${createdUsers.length} users`);

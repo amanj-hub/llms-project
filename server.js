@@ -346,13 +346,19 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     if (!user.isVerified) {
-      // Auto-resend OTP for unverified users trying to log in
-      const otp = generateOTP();
-      user.otp = await bcrypt.hash(otp, 10);
-      user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
-      await user.save();
-      try { await sendOTPEmail(email.toLowerCase(), otp); } catch (_) {}
-      return res.status(403).json({ needsVerification: true, email: email.toLowerCase(), error: 'Please verify your email first. A new OTP has been sent.' });
+      // Auto-verify seed accounts (e.g. aman@llms.io) since they are dummy emails
+      if (email.toLowerCase().endsWith('@llms.io')) {
+        user.isVerified = true;
+        await user.save();
+      } else {
+        // Auto-resend OTP for unverified users trying to log in
+        const otp = generateOTP();
+        user.otp = await bcrypt.hash(otp, 10);
+        user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+        await user.save();
+        try { await sendOTPEmail(email.toLowerCase(), otp); } catch (_) {}
+        return res.status(403).json({ needsVerification: true, email: email.toLowerCase(), error: 'Please verify your email first. A new OTP has been sent.' });
+      }
     }
     user.lastLogin = new Date();
     await user.save();
