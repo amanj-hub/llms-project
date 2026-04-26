@@ -2999,14 +2999,15 @@ function timeline() {
         <div class="panel-hdr"><div class="panel-title">${ICONS.users} Contributions</div></div>
         <div class="panel-body">
           ${(()=>{
+            const nameMap = { 'AMAN':'AMAN KUMAR', 'YASH':'YASH YADAV' };
             const contribMap = {};
-            // Always include Aman and Yash
             contribMap['AMAN KUMAR'] = { name:'AMAN KUMAR', color:'#3b82f6', init:'AK', cnt:0 };
             contribMap['YASH YADAV'] = { name:'YASH YADAV', color:'#8b5cf6', init:'YY', cnt:0 };
             S.lessons.forEach(l=>{
               const a = getAuthor(l.authorObj || l.author);
-              const n = a.name || 'Unknown';
-              if (!contribMap[n]) contribMap[n] = { name:n, color:a.color||'#6b7280', init:a.init||(n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()), cnt:0 };
+              let n = a.name || 'Unknown';
+              n = nameMap[n.toUpperCase()] || nameMap[n] || n;
+              if (!contribMap[n]) contribMap[n] = { name:n, color:a.color||'#6b7280', init:n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(), cnt:0 };
               contribMap[n].cnt++;
             });
             return Object.values(contribMap).map(u=>{
