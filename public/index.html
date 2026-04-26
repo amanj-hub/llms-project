@@ -2236,25 +2236,6 @@ function renderAuth() {
             Create Account
           </button>
         </div>
-        <div id="form-otp" class="hidden">
-          <div style="text-align:center;margin-bottom:20px">
-            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent-dim);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            </div>
-            <h3 style="color:var(--text-primary);margin:0 0 6px;font-size:18px">Check your email</h3>
-            <p style="color:var(--text-muted);font-size:13px;margin:0">We sent a 6-digit code to <strong id="otp-email-display" style="color:var(--accent)"></strong></p>
-          </div>
-          <div class="field">
-            <label class="field-label">Verification Code</label>
-            <input class="otp-input" id="otp-code" type="text" maxlength="6" placeholder="Enter 6-digit code" inputmode="numeric" pattern="[0-9]*" onkeypress="if(event.key==='Enter')doVerifyOTP()">
-          </div>
-          <button class="btn btn-primary btn-full btn-lg" style="margin-top:8px" onclick="doVerifyOTP()" id="otp-verify-btn">
-            Verify & Sign In
-          </button>
-          <p class="otp-info">Didn't receive the code? <button class="otp-resend" id="otp-resend-btn" onclick="doResendOTP()">Resend OTP</button></p>
-          <p class="otp-info" id="otp-timer"></p>
-          <button class="otp-back" onclick="switchTab('signup');$('form-otp').classList.add('hidden');$('form-signup').classList.remove('hidden')">&larr; Back to sign up</button>
-        </div>
       </div>
     </div>
   </div>`;
@@ -2283,13 +2264,6 @@ async function doLogin() {
     renderApp();
     toast(`Welcome back, ${S.user.name.split(' ')[0]}!`, 'success');
   } catch (err) {
-    // Handle unverified user — show OTP form
-    if (err.needsVerification) {
-      S._pendingEmail = err.email;
-      showOTPForm(err.email);
-      toast(err.message || 'Please verify your email first.', 'info');
-      return;
-    }
     toast(err.message || 'Server error. Is the Node server running?', 'error');
   }
 }
@@ -2312,94 +2286,16 @@ async function doSignup() {
     const data = await api('/api/auth/signup', {
       method: 'POST', body: JSON.stringify({ name, username, email, password: pass })
     });
-    if (data.needsVerification) {
-      // Show OTP form
-      S._pendingEmail = data.email;
-      showOTPForm(data.email);
-      toast('Verification code sent to your email!', 'success');
-    } else if (data.token) {
-      // Fallback: direct login (shouldn't happen with OTP)
-      S.user  = { ...data.user, id: data.user._id };
-      S.token = data.token;
-      localStorage.setItem('llms-token', S.token);
-      S.lessons = []; S.notifs = [];
-      renderApp();
-      toast(`Account created! Welcome, @${username}!`, 'success');
-      fireConfetti();
-    }
-  } catch (err) {
-    toast(err.message || 'Server error. Is the Node server running?', 'error');
-  }
-}
-
-function showOTPForm(email) {
-  $('form-login')?.classList.add('hidden');
-  $('form-signup')?.classList.add('hidden');
-  $('form-otp')?.classList.remove('hidden');
-  const emailDisplay = $('otp-email-display');
-  if (emailDisplay) emailDisplay.textContent = email;
-  $('otp-code')?.focus();
-  startResendCooldown();
-}
-
-async function doVerifyOTP() {
-  const otp = $('otp-code')?.value.trim();
-  const email = S._pendingEmail;
-  if (!otp || otp.length !== 6) { toast('Please enter the 6-digit code', 'error'); return; }
-  if (!email) { toast('Session expired. Please sign up again.', 'error'); return; }
-
-  const btn = $('otp-verify-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
-
-  try {
-    const data = await api('/api/auth/verify-otp', {
-      method: 'POST', body: JSON.stringify({ email, otp })
-    });
     S.user  = { ...data.user, id: data.user._id };
     S.token = data.token;
     localStorage.setItem('llms-token', S.token);
-    S._pendingEmail = null;
-    S.lessons = []; S.notifs = [];
+    await loadLessons();
+    await loadBookmarks();
     renderApp();
-    toast(`Account verified! Welcome to LearnSphere! 🎉`, 'success');
+    toast(`Account created! Welcome, @${username}!`, 'success');
     fireConfetti();
   } catch (err) {
-    toast(err.message || 'Verification failed', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = 'Verify & Sign In'; }
-  }
-}
-
-let _resendTimer = null;
-function startResendCooldown() {
-  const btn = $('otp-resend-btn');
-  const timerEl = $('otp-timer');
-  if (btn) btn.disabled = true;
-  let seconds = 60;
-  if (timerEl) timerEl.textContent = `Resend available in ${seconds}s`;
-  clearInterval(_resendTimer);
-  _resendTimer = setInterval(() => {
-    seconds--;
-    if (timerEl) timerEl.textContent = seconds > 0 ? `Resend available in ${seconds}s` : '';
-    if (seconds <= 0) {
-      clearInterval(_resendTimer);
-      if (btn) btn.disabled = false;
-    }
-  }, 1000);
-}
-
-async function doResendOTP() {
-  const email = S._pendingEmail;
-  if (!email) { toast('Session expired. Please sign up again.', 'error'); return; }
-  try {
-    await api('/api/auth/resend-otp', {
-      method: 'POST', body: JSON.stringify({ email })
-    });
-    toast('New verification code sent!', 'success');
-    startResendCooldown();
-    $('otp-code').value = '';
-    $('otp-code')?.focus();
-  } catch (err) {
-    toast(err.message || 'Failed to resend code', 'error');
+    toast(err.message || 'Server error. Is the Node server running?', 'error');
   }
 }
 

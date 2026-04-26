@@ -9,9 +9,12 @@ const multer       = require('multer');
 const fs           = require('fs');
 const session      = require('express-session');
 const passport     = require('passport');
-const nodemailer   = require('nodemailer');
-const crypto       = require('crypto');
+const dns          = require('dns');
 const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
+
+// Fix DNS resolution for MongoDB Atlas on restrictive networks
+dns.setServers(['8.8.8.8', '8.8.4.4', ...dns.getServers()]);
+
 dotenv.config();
 
 const app = express();
@@ -97,9 +100,7 @@ const UserSchema = new mongoose.Schema({
   googleId:   { type: String },
   avatar:     { type: String },
   bookmarks:  [{ type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' }],
-  otp:        { type: String },
-  otpExpiry:  { type: Date },
-  isVerified: { type: Boolean, default: false },
+  isVerified: { type: Boolean, default: true },
   createdAt:  { type: Date, default: Date.now },
   lastLogin:  { type: Date },
 });
@@ -164,49 +165,6 @@ const Notification = mongoose.model('Notification', NotifSchema);
 const signToken = (user) =>
   jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
-// ── Nodemailer transporter ──
-const emailTransporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-// ── Generate 6-digit OTP ──
-function generateOTP() {
-  return crypto.randomInt(100000, 999999).toString();
-}
-
-// ── Send OTP email ──
-async function sendOTPEmail(toEmail, otp) {
-  const html = `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-      <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:32px 24px;text-align:center">
-        <h1 style="color:#fff;margin:0;font-size:24px;font-weight:700">LearnSphere</h1>
-        <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px">Email Verification</p>
-      </div>
-      <div style="padding:32px 24px;text-align:center">
-        <p style="color:#374151;font-size:15px;margin:0 0 24px">Enter this code to verify your account:</p>
-        <div style="background:#f3f4f6;border:2px dashed #6366f1;border-radius:12px;padding:20px;margin:0 auto;display:inline-block">
-          <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#1f2937;font-family:monospace">${otp}</span>
-        </div>
-        <p style="color:#9ca3af;font-size:13px;margin:24px 0 0">This code expires in <strong style="color:#6366f1">5 minutes</strong>.</p>
-        <p style="color:#9ca3af;font-size:12px;margin:8px 0 0">If you didn't sign up for LearnSphere, ignore this email.</p>
-      </div>
-      <div style="background:#f9fafb;padding:16px 24px;text-align:center;border-top:1px solid #e5e7eb">
-        <p style="color:#9ca3af;font-size:11px;margin:0">&copy; ${new Date().getFullYear()} LearnSphere — Lessons Learned Management System</p>
-      </div>
-    </div>
-  `;
-  await emailTransporter.sendMail({
-    from: `"LearnSphere" <${process.env.EMAIL_USER}>`,
-    to: toEmail,
-    subject: 'Verify your LearnSphere account',
-    html,
-  });
-}
-
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -233,7 +191,7 @@ const calcSimilarity = (a, b) => {
 //  ROUTES — AUTH
 // ══════════════════════════════════════════════════════════
 
-/** POST /api/auth/signup — creates user + sends OTP */
+/** POST /api/auth/signup — creates user and returns token directly */
 app.post('/api/auth/signup', async (req, res) => {
   try {
     const { name, email, username, password } = req.body;
@@ -246,93 +204,20 @@ app.post('/api/auth/signup', async (req, res) => {
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
     const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username: username.toLowerCase() }] });
-    if (existing && existing.isVerified) {
+    if (existing) {
       return res.status(409).json({ error: 'Email or username is already registered' });
     }
-    // If unverified user exists with same email, delete and let them re-register
-    if (existing && !existing.isVerified) {
-      await User.deleteOne({ _id: existing._id });
-    }
 
-    const otp = generateOTP();
     const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#f472b6', '#22d3ee'];
     const user = new User({
       name: name.trim(), email, username: username.trim().toLowerCase(), password,
       color: colors[Math.floor(Math.random() * colors.length)],
-      otp: await bcrypt.hash(otp, 10),
-      otpExpiry: new Date(Date.now() + 5 * 60 * 1000),
-      isVerified: false,
+      isVerified: true,
     });
     await user.save();
 
-    try {
-      await sendOTPEmail(email.toLowerCase(), otp);
-    } catch (emailErr) {
-      console.error('❌ Failed to send OTP email:', emailErr.message);
-      return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
-    }
-
-    console.log(`📧 OTP sent to ${email}`);
-    res.status(201).json({ needsVerification: true, email: email.toLowerCase() });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-/** POST /api/auth/verify-otp — verifies OTP and returns token */
-app.post('/api/auth/verify-otp', async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-    if (!email || !otp) return res.status(400).json({ error: 'Email and OTP are required' });
-
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (user.isVerified) return res.status(400).json({ error: 'Account already verified' });
-
-    if (!user.otp || !user.otpExpiry) {
-      return res.status(400).json({ error: 'No OTP found. Please request a new one.' });
-    }
-    if (new Date() > user.otpExpiry) {
-      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
-    }
-    const isValid = await bcrypt.compare(otp, user.otp);
-    if (!isValid) {
-      return res.status(400).json({ error: 'Invalid OTP. Please check and try again.' });
-    }
-
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpiry = undefined;
-    user.lastLogin = new Date();
-    await user.save();
-
-    console.log(`✅ User verified: ${email}`);
-    res.json({ user, token: signToken(user) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-/** POST /api/auth/resend-otp — generates new OTP and sends email */
-app.post('/api/auth/resend-otp', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required' });
-
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    if (user.isVerified) return res.status(400).json({ error: 'Account already verified' });
-
-    const otp = generateOTP();
-    user.otp = await bcrypt.hash(otp, 10);
-    user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
-    await user.save();
-
-    try {
-      await sendOTPEmail(email.toLowerCase(), otp);
-    } catch (emailErr) {
-      console.error('❌ Failed to resend OTP:', emailErr.message);
-      return res.status(500).json({ error: 'Failed to send email. Please try again.' });
-    }
-
-    console.log(`📧 OTP resent to ${email}`);
-    res.json({ message: 'New OTP sent to your email' });
+    console.log(`✅ User created: ${email}`);
+    res.status(201).json({ user, token: signToken(user) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -344,21 +229,6 @@ app.post('/api/auth/login', async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user || !(await user.verifyPassword(password))) {
       return res.status(401).json({ error: 'Invalid email or password' });
-    }
-    if (!user.isVerified) {
-      // Auto-verify seed accounts (e.g. aman@llms.io) since they are dummy emails
-      if (email.toLowerCase().endsWith('@llms.io')) {
-        user.isVerified = true;
-        await user.save();
-      } else {
-        // Auto-resend OTP for unverified users trying to log in
-        const otp = generateOTP();
-        user.otp = await bcrypt.hash(otp, 10);
-        user.otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
-        await user.save();
-        try { await sendOTPEmail(email.toLowerCase(), otp); } catch (_) {}
-        return res.status(403).json({ needsVerification: true, email: email.toLowerCase(), error: 'Please verify your email first. A new OTP has been sent.' });
-      }
     }
     user.lastLogin = new Date();
     await user.save();
