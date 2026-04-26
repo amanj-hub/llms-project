@@ -28,17 +28,8 @@ const Lesson = mongoose.model('Lesson', LessonSchema);
 
 // ── Users ──────────────────────────────────────────────────────────
 const USERS = [
-  { name: 'AMAN',     email: 'aman@llms.io',     pass: 'admin123',  role: 'Admin',       color: '#3b82f6' },
-  { name: 'YASH',     email: 'yash@llms.io',     pass: 'yash123',   role: 'Team Member', color: '#8b5cf6' },
-  { name: 'HIMANSHU', email: 'himanshu@llms.io', pass: 'himan123',  role: 'Team Member', color: '#10b981' },
-  { name: 'AYUSH',    email: 'ayush@llms.io',    pass: 'ayush123',  role: 'Team Member', color: '#f59e0b' },
-  { name: 'DEVANSHU', email: 'devanshu@llms.io', pass: 'devan123',  role: 'Team Member', color: '#f472b6' },
-  { name: 'ABHAY',    email: 'abhay@llms.io',    pass: 'abhay123',  role: 'Team Member', color: '#0ea5e9' },
-  { name: 'AYUSHI',   email: 'ayushi@llms.io',   pass: 'ayushi123', role: 'Team Member', color: '#ec4899' },
-  { name: 'KHUSHI',   email: 'khushi@llms.io',   pass: 'khushi123', role: 'Team Member', color: '#14b8a6' },
-  { name: 'RUHI',     email: 'ruhi@llms.io',     pass: 'ruhi123',   role: 'Team Member', color: '#a855f7' },
-  { name: 'AAKRITI',  email: 'aakriti@llms.io',  pass: 'aakriti123',role: 'Team Member', color: '#f43f5e' },
-  { name: 'SNEHA',    email: 'sneha@llms.io',    pass: 'sneha123',  role: 'Team Member', color: '#f97316' },
+  { name: 'AMAN KUMAR', email: 'aman@llms.io', pass: 'admin123', role: 'Admin', color: '#3b82f6' },
+  { name: 'YASH YADAV', email: 'yash@llms.io', pass: 'yash123', role: 'Team Member', color: '#8b5cf6' },
 ];
 
 // ── Lessons factory ────────────────────────────────────────────────
@@ -65,7 +56,7 @@ const lessons = (users) => [
     challenge: 'App crashed on ~34% of Android devices (<3GB RAM) when scrolling transaction history with 500+ entries. Caused a 2.1★ App Store rating and significant user churn.',
     solution: 'Replaced FlatList with react-native-flash-list (recycled viewports), implemented cursor-based pagination (50 items/page), stored compressed transaction snapshots in SQLite for offline access, and pre-fetched only visible date ranges. Memory dropped 67%, crash rate went from 34% to 0.3%.',
     tags: ['mobile', 'performance', 'memory', 'android', 'virtualization'],
-    impact: 'high', author: users[2]._id, createdAt: new Date('2024-09-08'),
+    impact: 'high', author: users[0]._id, createdAt: new Date('2024-09-08'),
   },
   {
     project: 'DevOps Pipeline Migration', type: 'DevOps',
@@ -89,7 +80,7 @@ const lessons = (users) => [
     challenge: 'Analytics dashboard loaded in 2–3 minutes for datasets >500k rows. Executives would close the tab mid-presentation. Underlying PostgreSQL OLAP queries were timing out at the 60-second limit.',
     solution: 'Migrated aggregation workload to ClickHouse (columnar, 120× faster on large scans). Pre-materialised hourly rollups for common dimensions. Introduced WebSocket streaming to progressively render chart segments. Load time: 140s → 4.2s for the same dataset.',
     tags: ['analytics', 'clickhouse', 'olap', 'streaming', 'd3'],
-    impact: 'medium', author: users[2]._id, createdAt: new Date('2024-06-19'),
+    impact: 'medium', author: users[0]._id, createdAt: new Date('2024-06-19'),
   },
   {
     project: 'Security Auth Overhaul', type: 'Security',
@@ -97,7 +88,7 @@ const lessons = (users) => [
     challenge: 'Legacy session-based auth was vulnerable to CSRF and session fixation. Penetration test revealed 3 high-severity issues including predictable session IDs stored in cookies without Secure/HttpOnly flags.',
     solution: 'Migrated to OAuth2 + PKCE flow with short-lived JWTs (15 min) and rotating refresh tokens. Stored tokens in Redis with device fingerprinting. Integrated HashiCorp Vault for secret rotation. Enforced SameSite=Strict cookies and added MFA via TOTP. Zero auth incidents since.',
     tags: ['security', 'oauth2', 'jwt', 'vault', 'authentication'],
-    impact: 'high', author: users[3]._id, createdAt: new Date('2024-05-11'),
+    impact: 'high', author: users[1]._id, createdAt: new Date('2024-05-11'),
   },
   {
     project: 'Real-time Collaboration Tool', type: 'Web',
