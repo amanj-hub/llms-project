@@ -2998,19 +2998,30 @@ function timeline() {
       <div class="panel">
         <div class="panel-hdr"><div class="panel-title">${ICONS.users} Contributions</div></div>
         <div class="panel-body">
-          ${USERS.map(u=>{
-            const cnt=S.lessons.filter(l=>l.author===u.id).length;
-            return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-              <div class="av-xs" style="background:${u.color};width:28px;height:28px;font-size:10px">${u.init}</div>
-              <div style="flex:1">
-                <div style="font-size:13px;font-weight:500;margin-bottom:4px">${u.name}</div>
-                <div class="prog-bar">
-                  <div class="prog-fill" style="width:${S.lessons.length?Math.round(cnt/S.lessons.length*100):0}%;background:${u.color}40;"></div>
+          ${(()=>{
+            const contribMap = {};
+            // Always include Aman and Yash
+            contribMap['AMAN KUMAR'] = { name:'AMAN KUMAR', color:'#3b82f6', init:'AK', cnt:0 };
+            contribMap['YASH YADAV'] = { name:'YASH YADAV', color:'#8b5cf6', init:'YY', cnt:0 };
+            S.lessons.forEach(l=>{
+              const a = getAuthor(l.authorObj || l.author);
+              const n = a.name || 'Unknown';
+              if (!contribMap[n]) contribMap[n] = { name:n, color:a.color||'#6b7280', init:a.init||(n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()), cnt:0 };
+              contribMap[n].cnt++;
+            });
+            return Object.values(contribMap).map(u=>{
+              return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                <div class="av-xs" style="background:${u.color};width:28px;height:28px;font-size:10px">${u.init}</div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500;margin-bottom:4px">${u.name}</div>
+                  <div class="prog-bar">
+                    <div class="prog-fill" style="width:${S.lessons.length?Math.round(u.cnt/S.lessons.length*100):0}%;background:${u.color}40;"></div>
+                  </div>
                 </div>
-              </div>
-              <span class="badge badge-blue">${cnt}</span>
-            </div>`;
-          }).join('')}
+                <span class="badge badge-blue">${u.cnt}</span>
+              </div>`;
+            }).join('');
+          })()}
         </div>
       </div>
       <div class="panel">
