@@ -287,14 +287,19 @@ app.get('/auth/google',
 );
 
 /** GET /auth/google/callback — Google redirects here */
-app.get('/auth/google/callback',
-  passport.authenticate('google', { session: false, failureRedirect: '/?error=google_auth_failed' }),
-  (req, res) => {
-    const token = signToken(req.user);
-    // Redirect to frontend with token in URL — SPA picks it up
+app.get('/auth/google/callback', (req, res, next) => {
+  passport.authenticate('google', { session: false }, (err, user, info) => {
+    if (err) {
+      console.error('❌ OAuth Callback Error:', err);
+      return res.redirect('/?error=' + encodeURIComponent(err.message || 'internal_server_error'));
+    }
+    if (!user) {
+      return res.redirect('/?error=google_auth_failed');
+    }
+    const token = signToken(user);
     res.redirect(`/?token=${token}`);
-  }
-);
+  })(req, res, next);
+});
 
 // ══════════════════════════════════════════════════════════
 //  ROUTES — LESSONS
