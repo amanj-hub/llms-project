@@ -13,6 +13,7 @@ const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust Render's reverse proxy
 const PORT       = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'llms_dev_secret_2024_change_in_prod';
 const MONGO_URI  = process.env.MONGODB_URI || 'mongodb://localhost:27017/llms_v3';
@@ -239,7 +240,8 @@ passport.deserializeUser(async (id, done) => {
 passport.use(new GoogleStrategy({
   clientID:     process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL:  '/auth/google/callback',
+  callbackURL:  process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
+  proxy:        true
 }, async (accessToken, refreshToken, profile, done) => {
   try {
     const email     = profile.emails?.[0]?.value?.toLowerCase();
