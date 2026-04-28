@@ -43,6 +43,12 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Landing page at root (must be before static middleware)
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Uploads directory
@@ -52,8 +58,19 @@ if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+  destination: (req, file, cb) => {
+    const folderId = (req.body && req.body.folderId) || (req.query && req.query.folderId) || 'root';
+    // Prevent path traversal
+    const safeFolderId = String(folderId).replace(/[^a-zA-Z0-9_-]/g, '');
+    const dir = path.join(__dirname, 'uploads', safeFolderId);
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    // Sanitize filename to prevent path traversal
+    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, Date.now() + '-' + safe);
+  }
 });
 const upload = multer({ 
   storage, 
@@ -136,11 +153,25 @@ const LessonSchema = new mongoose.Schema({
   description: { type: String, maxlength: 10000 },
   link:        { type: String, trim: true },
 
+  // ── Folder reference ──
+  folder:      { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', default: null },
+
+  // ── Multi-file support ──
+  files:       [{
+    fileUrl:    { type: String },
+    fileName:   { type: String },
+    fileType:   { type: String },
+    fileSize:   { type: Number },
+    uploadedAt: { type: Date, default: Date.now }
+  }],
+
+  // ── Legacy single-file fields (backward compat) ──
+  fileUrl:     { type: String },
+  fileName:    { type: String },
+
   // ── Common fields ──
   tags:        [{ type: String, lowercase: true, trim: true }],
   visibility:  { type: String, enum: ['public', 'private'], default: 'public' },
-  fileUrl:     { type: String },
-  fileName:    { type: String },
   author:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   views:       { type: Number, default: 0 },
   createdAt:   { type: Date, default: Date.now },
@@ -148,7 +179,21 @@ const LessonSchema = new mongoose.Schema({
 });
 
 LessonSchema.index({ project: 'text', challenge: 'text', solution: 'text', title: 'text', description: 'text', tags: 'text' });
+LessonSchema.index({ folder: 1 });
+LessonSchema.index({ author: 1 });
 LessonSchema.pre('save', function (next) { this.updatedAt = Date.now(); next(); });
+
+/* FOLDER */
+const FolderSchema = new mongoose.Schema({
+  name:         { type: String, required: true, trim: true, maxlength: 100 },
+  description:  { type: String, trim: true, maxlength: 500, default: '' },
+  parentFolder: { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', default: null },
+  owner:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  visibility:   { type: String, enum: ['public', 'private'], default: 'public' },
+  createdAt:    { type: Date, default: Date.now },
+});
+FolderSchema.index({ owner: 1 });
+FolderSchema.index({ parentFolder: 1 });
 
 /* NOTIFICATION */
 const NotifSchema = new mongoose.Schema({
@@ -162,6 +207,7 @@ const NotifSchema = new mongoose.Schema({
 
 const User         = mongoose.model('User',         UserSchema);
 const Lesson       = mongoose.model('Lesson',       LessonSchema);
+const Folder       = mongoose.model('Folder',       FolderSchema);
 const Notification = mongoose.model('Notification', NotifSchema);
 
 // ══════════════════════════════════════════════════════════
@@ -318,13 +364,13 @@ app.get('/auth/google/callback', (req, res, next) => {
   passport.authenticate('google', { session: false }, (err, user, info) => {
     if (err) {
       console.error('❌ OAuth Callback Error:', err);
-      return res.redirect('/?error=' + encodeURIComponent(err.message || 'internal_server_error'));
+      return res.redirect('/app?error=' + encodeURIComponent(err.message || 'internal_server_error'));
     }
     if (!user) {
-      return res.redirect('/?error=google_auth_failed');
+      return res.redirect('/app?error=google_auth_failed');
     }
     const token = signToken(user);
-    res.redirect(`/?token=${token}`);
+    res.redirect(`/app?token=${token}`);
   })(req, res, next);
 });
 
@@ -345,7 +391,7 @@ app.get('/api/lessons/trending', authMiddleware, async (req, res) => {
 /** GET /api/lessons */
 app.get('/api/lessons', authMiddleware, async (req, res) => {
   try {
-    const { search, type, tech, tag, impact, authorId, category, sort = '-createdAt', page = 1, limit = 24 } = req.query;
+    const { search, type, tech, tag, impact, authorId, category, folder, sort = '-createdAt', page = 1, limit = 24 } = req.query;
 
     // Correctly show: all public lessons + current user's own private lessons
     const visibilityFilter = {
@@ -360,6 +406,13 @@ app.get('/api/lessons', authMiddleware, async (req, res) => {
     // Category filter
     if (category && ['project', 'lesson'].includes(category)) {
       query.$and.push({ category });
+    }
+
+    // Folder filter
+    if (folder === 'root') {
+      query.$and.push({ $or: [{ folder: null }, { folder: { $exists: false } }] });
+    } else if (folder) {
+      query.$and.push({ folder: folder });
     }
 
     if (search?.trim()) {
@@ -392,6 +445,7 @@ app.get('/api/lessons', authMiddleware, async (req, res) => {
     const [lessons, total] = await Promise.all([
       Lesson.find(query)
         .populate('author', 'name initials color username')
+        .populate('folder', 'name')
         .sort(sort).skip(skip).limit(parseInt(limit)),
       Lesson.countDocuments(query),
     ]);
@@ -416,13 +470,15 @@ app.get('/api/lessons/:id', authMiddleware, async (req, res) => {
 /** POST /api/lessons */
 app.post('/api/lessons', authMiddleware, async (req, res) => {
   try {
-    const { category, project, type, tech, challenge, solution, tags, impact, visibility, fileUrl, fileName, title, description, link } = req.body;
+    const { category, project, type, tech, challenge, solution, tags, impact, visibility, fileUrl, fileName, title, description, link, folderId, files: filesData } = req.body;
     const cat = category === 'lesson' ? 'lesson' : 'project';
     const commonFields = {
       category: cat,
       tags:       (tags || []).map(t => t.toLowerCase().trim()).filter(Boolean),
       visibility: visibility === 'private' ? 'private' : 'public',
       fileUrl, fileName,
+      folder:     folderId || null,
+      files:      filesData || [],
       author:     req.user._id,
     };
 
@@ -484,7 +540,7 @@ app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'You can only edit your own lessons' });
     }
 
-    const { project, type, tech, challenge, solution, tags, impact, visibility, fileUrl, fileName, title, description, link } = req.body;
+    const { project, type, tech, challenge, solution, tags, impact, visibility, fileUrl, fileName, title, description, link, folderId, files: filesData } = req.body;
     const cat = lesson.category || 'project';
 
     if (cat === 'project') {
@@ -510,6 +566,8 @@ app.put('/api/lessons/:id', authMiddleware, async (req, res) => {
     if (visibility)lesson.visibility= visibility;
     if (fileUrl !== undefined) lesson.fileUrl = fileUrl;
     if (fileName !== undefined) lesson.fileName = fileName;
+    if (folderId !== undefined) lesson.folder = folderId || null;
+    if (filesData !== undefined) lesson.files = filesData;
     await lesson.save();
     await lesson.populate('author', 'name initials color username');
     res.json(lesson);
@@ -613,11 +671,199 @@ app.patch('/api/notifications/read-all', authMiddleware, async (req, res) => {
 //  ROUTES — FILE UPLOAD
 // ══════════════════════════════════════════════════════════
 
-app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file uploaded or invalid format' });
-  res.json({ fileUrl: '/uploads/' + req.file.filename, fileName: req.file.originalname });
+app.post('/api/upload', authMiddleware, upload.array('files', 5), (req, res) => {
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No file uploaded or invalid format' });
+  const fileObjs = req.files.map(f => ({
+    fileUrl:  '/uploads/' + (req.body.folderId ? String(req.body.folderId).replace(/[^a-zA-Z0-9_-]/g, '') : 'root') + '/' + f.filename,
+    fileName: f.originalname,
+    fileType: path.extname(f.originalname).toLowerCase().replace('.', ''),
+    fileSize: f.size,
+    uploadedAt: new Date()
+  }));
+  // Return single-file compat + multi-file array
+  res.json({
+    files: fileObjs,
+    fileUrl: fileObjs[0].fileUrl,
+    fileName: fileObjs[0].fileName
+  });
 });
 
+// Also keep legacy single-file endpoint for backward compat
+app.post('/api/upload-single', authMiddleware, upload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded or invalid format' });
+  res.json({ fileUrl: '/uploads/root/' + req.file.filename, fileName: req.file.originalname });
+});
+
+// ══════════════════════════════════════════════════════════
+//  ROUTES — FOLDERS
+// ══════════════════════════════════════════════════════════
+
+/** POST /api/folders — create folder */
+app.post('/api/folders', authMiddleware, async (req, res) => {
+  try {
+    const { name, description, parentFolder, visibility } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Folder name is required' });
+
+    // Validate parent folder exists and user owns it (if provided)
+    if (parentFolder) {
+      const parent = await Folder.findById(parentFolder);
+      if (!parent) return res.status(404).json({ error: 'Parent folder not found' });
+      if (parent.owner.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ error: 'Cannot create subfolder in a folder you do not own' });
+      }
+    }
+
+    const folder = new Folder({
+      name: name.trim(),
+      description: (description || '').trim(),
+      parentFolder: parentFolder || null,
+      owner: req.user._id,
+      visibility: visibility === 'private' ? 'private' : 'public',
+    });
+    await folder.save();
+    await folder.populate('owner', 'name initials color username');
+    res.status(201).json(folder);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/** GET /api/folders — list folders */
+app.get('/api/folders', authMiddleware, async (req, res) => {
+  try {
+    const { parentFolder } = req.query;
+    const filter = {
+      $or: [
+        { owner: req.user._id },
+        { visibility: 'public' }
+      ]
+    };
+    if (parentFolder === 'root' || parentFolder === 'null') {
+      filter.parentFolder = null;
+    } else if (parentFolder) {
+      filter.parentFolder = parentFolder;
+    }
+    const folders = await Folder.find(filter)
+      .populate('owner', 'name initials color username')
+      .sort('name');
+    res.json(folders);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/** GET /api/folders/tree — get full folder tree for current user */
+app.get('/api/folders/tree', authMiddleware, async (req, res) => {
+  try {
+    const folders = await Folder.find({
+      $or: [
+        { owner: req.user._id },
+        { visibility: 'public' }
+      ]
+    }).populate('owner', 'name initials color username').sort('name');
+
+    // Build tree structure
+    const map = {};
+    const roots = [];
+    folders.forEach(f => { map[f._id.toString()] = { ...f.toObject(), children: [] }; });
+    folders.forEach(f => {
+      const node = map[f._id.toString()];
+      if (f.parentFolder && map[f.parentFolder.toString()]) {
+        map[f.parentFolder.toString()].children.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+    res.json(roots);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/** GET /api/folders/:id — get folder with contents */
+app.get('/api/folders/:id', authMiddleware, async (req, res) => {
+  try {
+    const folder = await Folder.findById(req.params.id)
+      .populate('owner', 'name initials color username');
+    if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+    // Access control
+    if (folder.visibility === 'private' && folder.owner._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Private folder' });
+    }
+
+    // Get subfolders
+    const subfolders = await Folder.find({ parentFolder: folder._id })
+      .populate('owner', 'name initials color username')
+      .sort('name');
+
+    // Get lessons in this folder
+    const lessons = await Lesson.find({ folder: folder._id })
+      .populate('author', 'name initials color username')
+      .sort('-createdAt');
+
+    // Build breadcrumb path
+    const breadcrumbs = [];
+    let current = folder;
+    while (current) {
+      breadcrumbs.unshift({ _id: current._id, name: current.name });
+      if (current.parentFolder) {
+        current = await Folder.findById(current.parentFolder);
+      } else {
+        current = null;
+      }
+      // Safety: max 10 levels deep
+      if (breadcrumbs.length > 10) break;
+    }
+
+    res.json({ folder, subfolders, lessons, breadcrumbs });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/** PUT /api/folders/:id — update folder */
+app.put('/api/folders/:id', authMiddleware, async (req, res) => {
+  try {
+    const folder = await Folder.findById(req.params.id);
+    if (!folder) return res.status(404).json({ error: 'Folder not found' });
+    if (folder.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'You can only edit your own folders' });
+    }
+    const { name, description, visibility, parentFolder } = req.body;
+    if (name?.trim()) folder.name = name.trim();
+    if (description !== undefined) folder.description = description.trim();
+    if (visibility) folder.visibility = visibility;
+    if (parentFolder !== undefined) {
+      // Prevent setting self as parent
+      if (parentFolder === folder._id.toString()) {
+        return res.status(400).json({ error: 'Folder cannot be its own parent' });
+      }
+      folder.parentFolder = parentFolder || null;
+    }
+    await folder.save();
+    await folder.populate('owner', 'name initials color username');
+    res.json(folder);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/** DELETE /api/folders/:id — delete folder, move contents to root */
+app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
+  try {
+    const folder = await Folder.findById(req.params.id);
+    if (!folder) return res.status(404).json({ error: 'Folder not found' });
+    if (folder.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'You can only delete your own folders' });
+    }
+
+    // Move subfolders to parent (or root)
+    await Folder.updateMany(
+      { parentFolder: folder._id },
+      { parentFolder: folder.parentFolder || null }
+    );
+
+    // Move lessons to root
+    await Lesson.updateMany(
+      { folder: folder._id },
+      { folder: null }
+    );
+
+    await folder.deleteOne();
+    res.json({ success: true, message: 'Folder deleted. Contents moved to parent.' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 
 // ══════════════════════════════════════════════════════════
@@ -645,6 +891,13 @@ app.get('/api/stats', authMiddleware, async (req, res) => {
 // ══════════════════════════════════════════════════════════
 //  SERVE FRONTEND
 // ══════════════════════════════════════════════════════════
+
+// Main app at /app
+app.get('/app', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// All other unmatched routes → SPA app
 app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

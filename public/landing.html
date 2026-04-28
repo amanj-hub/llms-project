@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LearnSphere — Turn Every Project into a Learning Asset</title>
+<meta name="description" content="LearnSphere is a structured knowledge and document management platform. Organize lessons, projects, and files with folder-based organization.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--bg2:#12121a;--surface:rgba(255,255,255,0.04);
+  --glass:rgba(255,255,255,0.06);--glass-border:rgba(255,255,255,0.08);
+  --text:#f0f0f5;--text2:#a0a0b8;--text3:#6b6b80;
+  --accent:#6366f1;--accent2:#8b5cf6;--accent3:#ec4899;
+  --gradient:linear-gradient(135deg,#6366f1,#8b5cf6,#ec4899);
+  --r:16px;--r-sm:10px;
+}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+
+/* ─── NAV ─── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;transition:all .3s}
+.nav.scrolled{background:rgba(10,10,15,0.85);backdrop-filter:blur(20px);border-bottom:1px solid var(--glass-border);padding:10px 0}
+.nav-inner{display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px}
+.nav-logo-icon{width:36px;height:36px;background:var(--gradient);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--text2);transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.btn-nav{padding:10px 24px;border-radius:10px;font-weight:600;font-size:14px;border:none;cursor:pointer;transition:all .3s}
+.btn-login{background:transparent;color:var(--text);border:1px solid var(--glass-border)}
+.btn-login:hover{border-color:var(--accent);color:var(--accent)}
+.btn-start{background:var(--gradient);color:#fff}
+.btn-start:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(99,102,241,0.4)}
+.mobile-toggle{display:none;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer}
+
+/* ─── HERO ─── */
+.hero{min-height:100vh;display:flex;align-items:center;position:relative;overflow:hidden;padding:120px 0 80px}
+.hero-bg{position:absolute;inset:0;z-index:0}
+.hero-orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:.3;animation:float 20s infinite}
+.hero-orb-1{width:600px;height:600px;background:#6366f1;top:-200px;right:-100px}
+.hero-orb-2{width:500px;height:500px;background:#ec4899;bottom:-200px;left:-100px;animation-delay:-7s}
+.hero-orb-3{width:300px;height:300px;background:#8b5cf6;top:40%;left:40%;animation-delay:-14s}
+.hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:60px 60px}
+.hero-content{position:relative;z-index:1;text-align:center;max-width:800px;margin:0 auto}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:100px;background:var(--glass);border:1px solid var(--glass-border);font-size:13px;color:var(--accent);font-weight:500;margin-bottom:28px;backdrop-filter:blur(10px)}
+.hero-badge .dot{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:pulse 2s infinite}
+.hero h1{font-size:clamp(36px,6vw,72px);font-weight:900;line-height:1.1;letter-spacing:-2px;margin-bottom:20px;background:linear-gradient(to bottom right,#fff 30%,var(--text2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{font-size:clamp(16px,2vw,20px);color:var(--text2);max-width:560px;margin:0 auto 36px;line-height:1.7}
+.hero-btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.btn-hero{padding:14px 32px;border-radius:12px;font-size:16px;font-weight:600;border:none;cursor:pointer;transition:all .3s;display:flex;align-items:center;gap:8px}
+.btn-primary{background:var(--gradient);color:#fff;box-shadow:0 4px 20px rgba(99,102,241,0.3)}
+.btn-primary:hover{transform:translateY(-3px);box-shadow:0 8px 40px rgba(99,102,241,0.5)}
+.btn-secondary{background:var(--glass);color:var(--text);border:1px solid var(--glass-border);backdrop-filter:blur(10px)}
+.btn-secondary:hover{border-color:var(--accent);transform:translateY(-2px)}
+.hero-stats{display:flex;justify-content:center;gap:48px;margin-top:56px}
+.hero-stat{text-align:center}
+.hero-stat .num{font-size:28px;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-stat .lbl{font-size:13px;color:var(--text3);margin-top:4px}
+
+/* ─── FEATURES ─── */
+.features{padding:120px 0;position:relative}
+.sec-label{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px}
+.sec-title{font-size:clamp(28px,4vw,44px);font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.sec-sub{font-size:17px;color:var(--text2);max-width:520px;margin-bottom:56px}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+.feat-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--r);padding:32px;transition:all .4s;position:relative;overflow:hidden}
+.feat-card:hover{border-color:rgba(99,102,241,0.3);transform:translateY(-4px);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.feat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--gradient);opacity:0;transition:opacity .3s}
+.feat-card:hover::before{opacity:1}
+.feat-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:18px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.15)}
+.feat-card h3{font-size:18px;font-weight:700;margin-bottom:10px}
+.feat-card p{font-size:14px;color:var(--text2);line-height:1.7}
+
+/* ─── HOW IT WORKS ─── */
+.how{padding:120px 0;background:var(--bg2)}
+.how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:32px;margin-top:20px}
+.step-card{text-align:center;padding:40px 24px;border-radius:var(--r);background:var(--glass);border:1px solid var(--glass-border);position:relative;transition:all .3s}
+.step-card:hover{transform:translateY(-6px);border-color:rgba(99,102,241,0.3)}
+.step-num{width:56px;height:56px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;margin:0 auto 20px;box-shadow:0 8px 30px rgba(99,102,241,0.3)}
+.step-card h3{font-size:18px;font-weight:700;margin-bottom:10px}
+.step-card p{font-size:14px;color:var(--text2);line-height:1.6}
+
+/* ─── DEMO ─── */
+.demo{padding:120px 0;position:relative;overflow:hidden}
+.demo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px}
+.demo-card{border-radius:var(--r);overflow:hidden;border:1px solid var(--glass-border);background:var(--glass);transition:all .4s}
+.demo-card:hover{transform:scale(1.02);border-color:rgba(99,102,241,0.3);box-shadow:0 20px 60px rgba(0,0,0,0.4)}
+.demo-card-hdr{padding:14px 20px;border-bottom:1px solid var(--glass-border);display:flex;align-items:center;gap:8px}
+.demo-dot{width:10px;height:10px;border-radius:50%}
+.demo-card-body{padding:24px}
+.mock-item{padding:12px 16px;border-radius:var(--r-sm);background:rgba(255,255,255,0.03);border:1px solid var(--glass-border);margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.mock-icon{font-size:18px}
+.mock-info .mock-name{font-size:14px;font-weight:600}
+.mock-info .mock-meta{font-size:11px;color:var(--text3)}
+.mock-badge{margin-left:auto;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:600}
+.badge-purple{background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.2)}
+.badge-green{background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.2)}
+.badge-blue{background:rgba(96,165,250,0.15);color:#60a5fa;border:1px solid rgba(96,165,250,0.2)}
+.badge-pink{background:rgba(236,72,153,0.15);color:#f472b6;border:1px solid rgba(236,72,153,0.2)}
+
+/* ─── CTA ─── */
+.cta{padding:120px 0;text-align:center;position:relative}
+.cta-box{padding:64px 40px;border-radius:24px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.12),rgba(236,72,153,0.08));border:1px solid rgba(99,102,241,0.2);position:relative;overflow:hidden}
+.cta-box::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(99,102,241,0.08),transparent 60%);pointer-events:none}
+.cta h2{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-1px;margin-bottom:16px}
+.cta p{color:var(--text2);font-size:17px;margin-bottom:36px;max-width:500px;margin-left:auto;margin-right:auto}
+
+/* ─── FOOTER ─── */
+.footer{padding:40px 0;border-top:1px solid var(--glass-border);text-align:center}
+.footer-inner{display:flex;flex-direction:column;align-items:center;gap:16px}
+.footer-brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;color:var(--text3);transition:color .2s}
+.footer-links a:hover{color:var(--accent)}
+.footer-copy{font-size:12px;color:var(--text3)}
+
+/* ─── ANIMATIONS ─── */
+@keyframes float{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-30px)}66%{transform:translate(-20px,20px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.reveal{opacity:0;transform:translateY(30px);transition:all .7s cubic-bezier(.4,0,.2,1)}
+.reveal.visible{opacity:1;transform:none}
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:768px){
+  .nav-links{display:none}
+  .mobile-toggle{display:block}
+  .hero-stats{gap:24px;flex-wrap:wrap}
+  .feat-grid,.how-grid,.demo-grid{grid-template-columns:1fr}
+  .cta-box{padding:40px 20px}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" id="nav">
+<div class="container nav-inner">
+  <a href="#" class="nav-logo"><div class="nav-logo-icon">LS</div> LearnSphere</a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">How It Works</a>
+    <a href="#demo">Preview</a>
+    <a href="/app" class="btn-nav btn-login">Log In</a>
+    <a href="/app" class="btn-nav btn-start">Get Started</a>
+  </div>
+  <button class="mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')" aria-label="Menu">☰</button>
+</div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+<div class="hero-bg">
+  <div class="hero-grid"></div>
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+  <div class="hero-orb hero-orb-3"></div>
+</div>
+<div class="container hero-content">
+  <div class="hero-badge"><span class="dot"></span> Knowledge Management Platform</div>
+  <h1>Turn Every Project into a Learning Asset</h1>
+  <p>LearnSphere helps teams capture, organize, and share project lessons in a structured knowledge base — so no insight is ever lost.</p>
+  <div class="hero-btns">
+    <a href="/app" class="btn-hero btn-primary">🚀 Get Started Free</a>
+    <a href="#demo" class="btn-hero btn-secondary">🔍 Explore Platform</a>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num">500+</div><div class="lbl">Lessons Shared</div></div>
+    <div class="hero-stat"><div class="num">120+</div><div class="lbl">Active Users</div></div>
+    <div class="hero-stat"><div class="num">50+</div><div class="lbl">Organizations</div></div>
+    <div class="hero-stat"><div class="num">99.9%</div><div class="lbl">Uptime</div></div>
+  </div>
+</div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+<div class="container">
+  <div class="sec-label reveal">✦ FEATURES</div>
+  <div class="sec-title reveal">Everything you need to manage knowledge</div>
+  <div class="sec-sub reveal">A powerful toolkit for capturing lessons, organizing documents, and sharing insights across your team.</div>
+  <div class="feat-grid">
+    <div class="feat-card reveal"><div class="feat-icon">📁</div><h3>Folder-Based Organization</h3><p>Create nested folders to organize lessons and projects — just like Google Drive. Keep your knowledge structured and easy to navigate.</p></div>
+    <div class="feat-card reveal"><div class="feat-icon">📎</div><h3>Multi-File Uploads</h3><p>Attach PDFs, Word docs, and PowerPoint files to any lesson. Drag-and-drop up to 5 files per entry with automatic type detection.</p></div>
+    <div class="feat-card reveal"><div class="feat-icon">🔐</div><h3>Public & Private Sharing</h3><p>Control who sees your content. Share publicly with the community or keep sensitive lessons private to your account only.</p></div>
+    <div class="feat-card reveal"><div class="feat-icon">🔍</div><h3>Smart Search & Tags</h3><p>Find any lesson instantly with full-text search across projects, technologies, and tags. Filter by type, impact, and category.</p></div>
+    <div class="feat-card reveal"><div class="feat-icon">🔑</div><h3>Google & Email Auth</h3><p>Sign up in seconds with Google OAuth or traditional email. Secure JWT-based sessions keep your data protected.</p></div>
+    <div class="feat-card reveal"><div class="feat-icon">📊</div><h3>Analytics Dashboard</h3><p>Track trending lessons, technology popularity, and team activity. AI-powered recommendations surface relevant knowledge.</p></div>
+  </div>
+</div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+<div class="container">
+  <div class="sec-label reveal">✦ HOW IT WORKS</div>
+  <div class="sec-title reveal">Start sharing knowledge in minutes</div>
+  <div class="sec-sub reveal">Four simple steps to transform your project experiences into reusable learning assets.</div>
+  <div class="how-grid">
+    <div class="step-card reveal"><div class="step-num">1</div><h3>Create Account</h3><p>Sign up with Google or email in under 30 seconds. No credit card required.</p></div>
+    <div class="step-card reveal"><div class="step-num">2</div><h3>Document Lessons</h3><p>Capture challenges faced, solutions implemented, and technologies used in structured entries.</p></div>
+    <div class="step-card reveal"><div class="step-num">3</div><h3>Organize in Folders</h3><p>Group related lessons into folders. Attach files, set visibility, and add searchable tags.</p></div>
+    <div class="step-card reveal"><div class="step-num">4</div><h3>Share & Discover</h3><p>Publish lessons for your team. Explore community knowledge and bookmark useful insights.</p></div>
+  </div>
+</div>
+</section>
+
+<!-- DEMO -->
+<section class="demo" id="demo">
+<div class="container">
+  <div class="sec-label reveal">✦ PREVIEW</div>
+  <div class="sec-title reveal">See what LearnSphere looks like inside</div>
+  <div class="sec-sub reveal">A modern, intuitive interface designed for knowledge workers.</div>
+  <div class="demo-grid">
+    <div class="demo-card reveal">
+      <div class="demo-card-hdr"><div class="demo-dot" style="background:#f87171"></div><div class="demo-dot" style="background:#fbbf24"></div><div class="demo-dot" style="background:#34d399"></div><span style="margin-left:8px;font-size:12px;color:var(--text3)">📁 Folder View</span></div>
+      <div class="demo-card-body">
+        <div class="mock-item"><span class="mock-icon">📁</span><div class="mock-info"><div class="mock-name">Architecture Docs</div><div class="mock-meta">5 lessons · 12 files</div></div><span class="mock-badge badge-purple">Private</span></div>
+        <div class="mock-item"><span class="mock-icon">📁</span><div class="mock-info"><div class="mock-name">Sprint Retrospectives</div><div class="mock-meta">8 lessons · 3 files</div></div><span class="mock-badge badge-green">Public</span></div>
+        <div class="mock-item"><span class="mock-icon">📄</span><div class="mock-info"><div class="mock-name">API Gateway Redesign</div><div class="mock-meta">Go, gRPC, Istio · High Impact</div></div><span class="mock-badge badge-blue">Backend</span></div>
+        <div class="mock-item"><span class="mock-icon">📄</span><div class="mock-info"><div class="mock-name">ML Pipeline Monitoring</div><div class="mock-meta">Python, TensorFlow · High Impact</div></div><span class="mock-badge badge-pink">AI</span></div>
+      </div>
+    </div>
+    <div class="demo-card reveal">
+      <div class="demo-card-hdr"><div class="demo-dot" style="background:#f87171"></div><div class="demo-dot" style="background:#fbbf24"></div><div class="demo-dot" style="background:#34d399"></div><span style="margin-left:8px;font-size:12px;color:var(--text3)">📊 Dashboard</span></div>
+      <div class="demo-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div style="padding:16px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.15);border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent">248</div><div style="font-size:11px;color:var(--text3)">Public Lessons</div></div>
+          <div style="padding:16px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.15);border-radius:10px;text-align:center"><div style="font-size:24px;font-weight:800;color:#34d399">42</div><div style="font-size:11px;color:var(--text3)">High Impact</div></div>
+        </div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">🔥 Trending</div>
+        <div class="mock-item"><span class="mock-icon">🥇</span><div class="mock-info"><div class="mock-name">E-Commerce Rebuild</div><div class="mock-meta">340 views · React, Redis</div></div></div>
+        <div class="mock-item"><span class="mock-icon">🥈</span><div class="mock-info"><div class="mock-name">Security Auth Overhaul</div><div class="mock-meta">210 views · OAuth2, Vault</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+<div class="container">
+  <div class="cta-box reveal">
+    <h2>Start Sharing Your Knowledge Today</h2>
+    <p>Join hundreds of developers and teams who use LearnSphere to turn project experiences into lasting learning assets.</p>
+    <a href="/app" class="btn-hero btn-primary" style="display:inline-flex;margin:0 auto">🚀 Join LearnSphere — It's Free</a>
+  </div>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+<div class="container footer-inner">
+  <div class="footer-brand"><div class="nav-logo-icon" style="width:28px;height:28px;font-size:11px">LS</div> LearnSphere</div>
+  <div class="footer-links">
+    <a href="https://github.com/amanj-hub" target="_blank">GitHub</a>
+    <a href="https://linkedin.com" target="_blank">LinkedIn</a>
+    <a href="#features">Features</a>
+    <a href="/app">Launch App</a>
+  </div>
+  <div class="footer-copy">Developed by <strong>Aman Kumar</strong> · © 2024–2026 LearnSphere. All rights reserved.</div>
+</div>
+</footer>
+
+<script>
+// Sticky nav
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('scrolled',window.scrollY>50)});
+
+// Scroll reveal
+const obs=new IntersectionObserver((entries)=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');obs.unobserve(e.target)}})},{threshold:0.15});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+// Mobile nav
+const style=document.createElement('style');
+style.textContent='.nav-links.show{display:flex!important;position:fixed;top:60px;left:0;right:0;flex-direction:column;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);padding:24px;gap:16px;border-bottom:1px solid var(--glass-border)}';
+document.head.appendChild(style);
+</script>
+</body>
+</html>
